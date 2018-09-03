@@ -46,7 +46,7 @@
             </div>
             <div>
               <button class="weui-btn myButton" size="mini" type="primary" @click="queryMineLog()" >我的记录</button>
-              <button class="weui-btn myButton" size="mini" type="primary" @click="queryAllLog()" >所有记录</button>
+              <button class="weui-btn myButton" size="mini" type="primary" :disabled="!group1 || !group2 || !group3"  @click="downloadLog" >下载记录</button>
               <button class="weui-btn myButton" size="mini" type="primary" @click="scanCode" :disabled="!group3" >二维码扫描</button>
             </div>
           </div>
@@ -92,15 +92,18 @@ export default {
       userInfo: {},
       openId: null,
       showGetInfo: false,
-      group: null
+      group: null,
+      downLoadUrl: null
     }
   },
   mounted () {
+    var _this = this;
     this.getUserInfo()
-    this.queryUserInfo()
-    this.queryGroup1List()
-    this.queryGroup2List()
-    this.queryGroup3List()
+    this.queryUserInfo(function() {
+      _this.queryGroup1List()
+      _this.queryGroup2List()
+      _this.queryGroup3List()
+    })
   },
   methods: {
     addGroup1: function() {
@@ -118,7 +121,8 @@ export default {
         url: 'https://www.cloudchained.cn/qrcode/group/add',
         data: {
           name: name,
-          parentId: parentId
+          parentId: parentId,
+          openId: _this.openId
         },
         method: 'POST',
         success (data) {
@@ -170,7 +174,8 @@ export default {
         url: 'https://www.cloudchained.cn/qrcode/group/groupList',
         method: 'GET',
         data: {
-          parentId: parentId || ''
+          parentId: parentId || '',
+          openId: _this.openId
         },
         success (data) {
           var list = []
@@ -280,6 +285,9 @@ export default {
               _this.openId = data.openid
               _this.queryLogList()
               _this.loading = false
+              if (callback) {
+                callback()
+              }
             }
           })
         }
@@ -320,9 +328,6 @@ export default {
       })
     },
     queryMineLog: function() {
-      this.queryAllLog(true)
-    },
-    queryAllLog: function(isMine) {
       var _this = this
       ajax({
         url: 'https://www.cloudchained.cn/qrcode/log/pageQuery',
@@ -331,11 +336,40 @@ export default {
           page: 1,
           pageSize: 100,
           data: {
-            openId: isMine ? _this.openId : null
+            openId: _this.openId
           }
         },
         success (data) {
           _this.scanList = data.items
+        }
+      })
+    },
+    downloadLog (contract) {
+      wx.showLoading({
+        title: '记录下载中...',
+        mask: true
+      })
+      var downLoadUrl = "https://www.cloudchained.cn/qrcode/log/downLoad?group1=" +
+        encodeURIComponent(this.group1) +
+        "&group2=" + encodeURIComponent(this.group2) +
+        "&group3=" + encodeURIComponent(this.group3)
+      wx.downloadFile({
+        url: downLoadUrl,
+        success: function (res) {
+          var filePath = res.tempFilePath
+          wx.openDocument({
+            filePath: filePath,
+            fileType: 'xlsx',
+            success: function (res) {
+              console.log('打开文档成功')
+            },
+            error: function (err) {
+              console.info(err)
+            }
+          })
+        },
+        complete: function () {
+          wx.hideLoading()
         }
       })
     }
