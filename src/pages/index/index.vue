@@ -12,42 +12,38 @@
         </div>
     </div>
     <div v-show="!showGetInfo">
-      <div class="weui-flex">
-        <div class="weui-flex__item">
           <picker  @change="changeGroup1" :value="group1" :range="group1List">
-            <button class="weui-btn" size="mini" type="default">{{group1 ? gorup1ShortName : '一级分类'}}</button>
+            <button style="width: 100%" class="weui-btn" size="mini" type="default">{{group1 ? gorup1ShortName : '选择一级分类'}}</button>
           </picker>
-        </div>
-        <div class="weui-flex__item">
           <picker  @change="changeGroup2" :value="group2" :range="group2List">
-            <button class="weui-btn" size="mini" type="default">{{group2 ? gorup2ShortName : '二级分类'}}</button>
+            <button style="width: 100%" class="weui-btn" size="mini" type="default">{{group2 ? gorup2ShortName : '选择二级分类'}}</button>
           </picker>
-        </div>
-        <div class="weui-flex__item">
           <picker  @change="changeGroup3" :value="group3" :range="group3List">
-            <button class="weui-btn" size="mini" type="default">{{group3 ? gorup3ShortName : '三级分类'}}</button>
+            <button style="width: 100%" class="weui-btn" size="mini" type="default">{{group3 ? gorup3ShortName : '选择三级分类'}}</button>
           </picker>
-        </div>
-      </div>
       <div class="weui-panel weui-panel_access">
-          <div class="weui-panel__bd">
-            <div class="weui-media-box weui-media-box_text">
-              <div class="weui-media-box__desc">{{group1 ? group1 + ' - ' : ''}}  {{group2 ? group2 + ' - ' : ''}}  {{group3}}</div>
-            </div>
-          </div>
-          <div class="weui-panel__ft" >
-            <div>
+          <div class="weui-panel__ft">
+            <div  v-show="showChangeGroup">
                 <input class="weui-input" v-model="group" placeholder="输入分类" />
             </div>
-            <div>
+            <div  v-show="showChangeGroup">
               <button class="weui-btn myButton" size="mini" type="default" @click="addGroup1" :disabled="!group" >+1级</button>
               <button class="weui-btn myButton" size="mini" type="default" @click="addGroup2" :disabled="!group1 || !group" >+2级</button>
               <button class="weui-btn myButton" size="mini" type="default" @click="addGroup3" :disabled="!group2 || !group">+3级</button>
             </div>
+            <div  v-show="showChangeGroup">
+              <button class="weui-btn myButton" size="mini" type="default" @click="delGroup(1, group1)" :disabled="!group1" >-1级</button>
+              <button class="weui-btn myButton" size="mini" type="default" @click="delGroup(2, group2)" :disabled="!group2" >-2级</button>
+              <button class="weui-btn myButton" size="mini" type="default" @click="delGroup(3, group3)" :disabled="!group3" >-3级</button>
+            </div>
             <div>
-              <button class="weui-btn myButton" size="mini" type="primary" @click="queryMineLog()" >我的记录</button>
+              <div>
+                <input class="weui-input" v-model="qrcode" placeholder="输入二维码" />
+              </div>
+              <button class="weui-btn" size="mini" type="" @click="showChangeGroup = !showChangeGroup">{{showChangeGroup ? '关闭操作' : '操作分类'}}</button>
+              <button class="weui-btn myButton" size="mini" type="primary":disabled="!qrcode || !group3" @click="inputCode(qrcode)" >手动导入</button>
               <button class="weui-btn myButton" size="mini" type="primary" :disabled="!group1 || !group2 || !group3"  @click="downloadLog" >下载记录</button>
-              <button class="weui-btn myButton" size="mini" type="primary" @click="scanCode" :disabled="!group3" >二维码扫描</button>
+               <button class="weui-btn myButton" style="margin-right: 20px; margin-bottom: 10px;" type="primary" @click="scanCode" :disabled="!group3" >扫描导入</button>
             </div>
           </div>
       </div>
@@ -93,7 +89,9 @@ export default {
       openId: null,
       showGetInfo: false,
       group: null,
-      downLoadUrl: null
+      downLoadUrl: null,
+      qrcode: null,
+      showChangeGroup: false
     }
   },
   mounted () {
@@ -138,6 +136,33 @@ export default {
           _this['group' + level] = name
           _this['gorup' + level + 'ShortName'] = _this.getShortGroupName(name)
           _this['group' + level + 'Map'][name] = data.id
+        },
+        fail (data) {
+          wx.showModal({
+            title: '出错',
+            content: data.errorMsg ? data.errorMsg : '系统出错',
+            success: function(res) {
+            }
+          })
+        }
+      })
+    },
+    delGroup: function(level, group) {
+      var _this = this
+      var id = this.getGroupId(level, group)
+      ajax({
+        url: 'https://www.cloudchained.cn/qrcode/group/delete?id=' + id,
+        data: {},
+        method: 'POST',
+        success (data) {
+          wx.showToast({
+            title: '删除成功',
+            icon: 'success',
+            duration: 2000
+          })
+          _this['group' + level] = null
+          var list = _this['group' + level + 'List']
+          list.splice(list.indexOf(group), 1)
         },
         fail (data) {
           wx.showModal({
@@ -220,52 +245,56 @@ export default {
         onlyFromCamera: true,
         scanType: ['qrCode'],
         success: (res) => {
-          ajax({
-            url: 'https://www.cloudchained.cn/qrcode/log/add',
-            method: 'POST',
-            data: {
-              userId: _this.userInfo.nickName,
-              openId: _this.openId,
-              group1: _this.group1,
-              group2: _this.group2,
-              group3: _this.group3,
-              qrcode: res.result
-            },
-            success (data) {
-              var isExist = _.find(_this.scanList, function(s) {
-                return s.id === data.id
-              })
-              if (isExist) {
-                wx.showModal({
-                  title: '提示！',
-                  content: '已被【' + data.userId + '】- 于【' + data.createTime + '】扫描到: ' + data.group1 + ' - ' + data.group2 + ' - ' + data.group3,
-                  success: function(res) {
-                  }
-                })
-              } else {
-                wx.showToast({
-                  title: '成功扫描入库',
-                  icon: 'success',
-                  duration: 2000
-                })
-                _this.scanList.unshift(data)
-              }
-            },
-            fail (data) {
-              wx.showModal({
-                title: '出错',
-                content: data.errorMsg ? data.errorMsg : '系统出错',
-                success: function(res) {
-                }
-              })
-            }
-          })
+          _this.inputCode(res.result)
         },
         fail: (err) => {
           console.info(err)
         },
         complete: (res) => {
           this.isScan = false
+        }
+      })
+    },
+    inputCode(code) {
+      var _this = this
+      ajax({
+        url: 'https://www.cloudchained.cn/qrcode/log/add',
+        method: 'POST',
+        data: {
+          userId: _this.userInfo.nickName,
+          openId: _this.openId,
+          group1: _this.group1,
+          group2: _this.group2,
+          group3: _this.group3,
+          qrcode: code
+        },
+        success (data) {
+          var isExist = _.find(_this.scanList, function(s) {
+            return s.id === data.id
+          })
+          if (isExist) {
+            wx.showModal({
+              title: '提示！',
+              content: '已被【' + data.userId + '】- 于【' + data.createTime + '】扫描到: ' + data.group1 + ' - ' + data.group2 + ' - ' + data.group3,
+              success: function(res) {
+              }
+            })
+          } else {
+            wx.showToast({
+              title: '成功扫描入库',
+              icon: 'success',
+              duration: 2000
+            })
+            _this.scanList.unshift(data)
+          }
+        },
+        fail (data) {
+          wx.showModal({
+            title: '出错',
+            content: data.errorMsg ? data.errorMsg : '系统出错',
+            success: function(res) {
+            }
+          })
         }
       })
     },
