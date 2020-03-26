@@ -9,6 +9,9 @@ const mutations = {
   SET_OPENID (state, openId) {
     state.openId = openId
   },
+  SET_WXNAME (state, wxName) {
+    state.wxName = wxName
+  },
   SET_FINANCE_RATE (state, financeRate) {
     state.financeRate = financeRate
   },

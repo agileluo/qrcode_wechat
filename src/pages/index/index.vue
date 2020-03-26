@@ -95,13 +95,7 @@ export default {
     }
   },
   mounted () {
-    var _this = this;
     this.getUserInfo()
-    this.queryUserInfo(function() {
-      _this.queryGroup1List()
-      _this.queryGroup2List()
-      _this.queryGroup3List()
-    })
   },
   methods: {
     addGroup1: function() {
@@ -243,7 +237,7 @@ export default {
       _this.isScan = true
       wx.scanCode({
         onlyFromCamera: true,
-        scanType: ['qrCode'],
+        scanType: ['barCode', 'qrCode'],
         success: (res) => {
           _this.inputCode(res.result)
         },
@@ -298,6 +292,14 @@ export default {
         }
       })
     },
+    queryUserAndGroupInfo() {
+      var _this = this
+      this.queryUserInfo(function() {
+        _this.queryGroup1List()
+        _this.queryGroup2List()
+        _this.queryGroup3List()
+      })
+    },
     queryUserInfo(callback) {
       var _this = this
       this.loading = true
@@ -311,6 +313,12 @@ export default {
             success (data) {
               console.info(data)
               store.commit('SET_OPENID', data.openid)
+              if (!data.userName) {
+                wx.redirectTo({
+                  url: '../bindUser/main'
+                })
+                return
+              }
               _this.openId = data.openid
               _this.queryLogList()
               _this.loading = false
@@ -329,6 +337,8 @@ export default {
           success: (res) => {
             console.info(res.userInfo)
             _this.userInfo = res.userInfo
+            store.commit('SET_WXNAME', res.userInfo.nickName)
+            _this.queryUserAndGroupInfo()
           },
           fail: () => {
             _this.showGetInfo = true
@@ -337,6 +347,7 @@ export default {
       } else {
         this.showGetInfo = false
         this.userInfo = res.userInfo
+        this.queryUserAndGroupInfo()
       }
     },
     queryLogList: function() {
